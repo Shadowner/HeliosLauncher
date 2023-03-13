@@ -12,6 +12,7 @@ import { AdoptiumBinary, JavaMetaObject, JavaRuntimeVersion } from '../util/Java
 
 
 const logger = LoggerUtil.getLogger("JavaGuard");
+
 export class JavaGuard extends EventEmitter {
 
 

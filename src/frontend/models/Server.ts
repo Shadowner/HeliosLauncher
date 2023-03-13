@@ -1,4 +1,4 @@
-import { Module } from "./Module"
+import { Module, IModule } from './Module';
 
 export interface IServer {
     id: string,
@@ -10,7 +10,7 @@ export interface IServer {
     minecraftVersion: string,
     isMainServer: boolean,
     autoconnect: boolean,
-    modules: Module[],
+    modules: IModule[],
 }
 
 /**
@@ -26,8 +26,7 @@ export class Server {
      */
     public static fromJSON(json: IServer) {
 
-        const mdls = json.modules
-        json.modules = []
+        const modules = json.modules
 
         const serv = new Server(
             json.id,
@@ -38,10 +37,9 @@ export class Server {
             json.address,
             json.minecraftVersion,
             json.isMainServer,
-            json.autoconnect,
-            json.modules
+            json.autoconnect
         )
-        serv.resolveModules(mdls)
+        serv.resolveModules(modules)
 
         return serv
     }
@@ -60,14 +58,13 @@ export class Server {
         public modules: Module[] = [],
     ) { }
 
-
-    private resolveModules(json) {
+    // TODO: Put this in the constructor
+    private resolveModules(jsonModule: IModule[]) {
         const modules: Module[] = []
-        for (let m of json) {
-            modules.push(Module.fromJSON(m, this.id))
+        for (const module of jsonModule) {
+            modules.push(Module.fromJSON(module, this.id))
         }
         this.modules = modules
     }
-
 
 }

@@ -7,22 +7,31 @@ import { DistroIndex, IDistroIndex } from '../models/DistroIndex';
 import fetch from 'node-fetch';
 
 const logger = LoggerUtil.getLogger('DistroManager')
+// eslint-disable-next-line no-shadow
 export enum DistroTypes {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     Library,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     ForgeHosted,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     Forge, // Unimplemented
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     LiteLoader,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     ForgeMod,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     LiteMod,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     File,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     VersionManifest,
 }
 
 export class DistroManager {
 
     public static distribution?: DistroIndex;
-    private static readonly DISTRO_PATH = join(ConfigManager.getLauncherDirectory(), 'distribution.json')
-    private static readonly DEV_PATH = join(ConfigManager.getLauncherDirectory(), 'dev_distribution.json')
+    private static readonly distroPath = join(ConfigManager.getLauncherDirectory(), 'distribution.json')
+    private static readonly devPath = join(ConfigManager.getLauncherDirectory(), 'dev_distribution.json')
 
     /**
      * @returns {Promise.<DistroIndex>}
@@ -31,8 +40,7 @@ export class DistroManager {
         if (DevUtil.IsDev) return this.pullLocal();
 
         const distroDest = join(ConfigManager.getLauncherDirectory(), 'distribution.json')
-        const response = await fetch(ConfigManager.DistributionURL, { signal: AbortSignal.timeout(2500) });
-
+        const response = await fetch(ConfigManager.distributionURL, { signal: AbortSignal.timeout(2500) });
         this.distribution = DistroIndex.fromJSON(await response.json() as IDistroIndex);
 
         writeFile(distroDest, JSON.stringify(this.distribution), 'utf-8').catch(e => {
@@ -46,9 +54,10 @@ export class DistroManager {
     /**
      * @returns {Promise.<DistroIndex>}
      */
+    // TODO: Change this to fetch it from the electron store with IPCRenderer
     public static async pullLocal() {
-        const file = await readFile(DevUtil.IsDev ? this.DEV_PATH : this.DISTRO_PATH, 'utf-8');
-        this.distribution = DistroIndex.fromJSON(JSON.parse(file));
+        const file = await readFile(DevUtil.IsDev ? this.devPath : this.distroPath, 'utf-8');
+        this.distribution = DistroIndex.fromJSON(JSON.parse(file) as IDistroIndex);
         return this.distribution;
 
     }

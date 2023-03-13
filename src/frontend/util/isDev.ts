@@ -4,12 +4,11 @@ const isEnvSet = 'ELECTRON_IS_DEV' in process.env
 export class DevUtil {
     private static enforceDevMode = false;
 
-    public static get IsDev() {
-        //@ts-ignore
+    public static get isDev() {
         return this.enforceDevMode ?? isEnvSet ? getFromEnv : (process.defaultApp || /node_modules[\\/]electron[\\/]/.test(process.execPath))
     }
 
-    public static set IsDev(value) {
+    public static set isDev(value) {
         this.enforceDevMode = value;
     }
 }

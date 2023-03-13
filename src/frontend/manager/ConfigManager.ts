@@ -1,12 +1,47 @@
 import { ensureDirSync, moveSync } from "fs-extra";
-import { LoggerUtil } from "helios-core/.";
+import { LoggerUtil } from "helios-core";
 import { existsSync, readFileSync, writeFileSync } from "fs-extra";
 import os from 'os';
 import { join } from 'path';
 import { MinecraftUtil } from "../util/MinecraftUtil";
 import { resolveMaxRAM, resolveMinRAM } from "../util/System";
+import { Module } from "../models/Module";
 
 const logger = LoggerUtil.getLogger("ConfigManager");
+
+type ModConfigFallBack = {
+    mods: Record<string, Module | ModConfigFallBack>,
+    value: boolean,
+}
+
+type ModConfig = {
+    id: string,
+    mods: Record<string, Module | ModConfigFallBack> | ModConfigFallBack,
+}
+
+export type AuthData<T = 'mojang' | 'microsoft'> = {
+    type: T,
+    accessToken: string,
+    username: string,
+    uuid: string,
+    displayName: string,
+    expiresAt: T extends 'mojang' ? undefined : Date,
+    microsoft: T extends 'mojang' ? undefined : {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        access_token: string,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        refresh_token: string,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        expires_at: Date,
+    },
+}
+
+type JavaConfig = {
+    minRAM: string;
+    maxRAM: string;
+    executable?: string;
+    jvmOptions: string[];
+}
 
 type Config = {
     settings: {
@@ -24,30 +59,31 @@ type Config = {
 
     },
     newsCache: {
-        date?: any,
+        date?: Date,
         content?: any,
         dismissed: boolean,
     },
     clientToken?: string,
-    selectedServer?: any, // Resolved
-    selectedAccount?: any,
-    authenticationDatabase: any,
-    modConfigurations: any[],
-    javaConfig: any,
+    selectedServer?: string, // Resolved
+    selectedAccount?: string,
+    authenticationDatabase: Record<string, AuthData>,
+    modConfigurations: ModConfig[],
+    javaConfig: Record<string, JavaConfig>,
 }
 
 
 export class ConfigManager {
 
-    private static sysRoot = process.env.APPDATA ?? (process.platform == "darwin" ? process.env.HOME + "/Library/Application Support" : process.env.HOME) ?? "";
+    private static sysRoot = process.env.APPDATA ?? (process.platform === "darwin" ? process.env.HOME + "/Library/Application Support" : process.env.HOME) ?? "";
     // TODO change
     private static dataPath = join(this.sysRoot, ".randomia");
-    private static configPath = join(exports.getLauncherDirectory(), "config.json");
+    private static configPath = join(this.getLauncherDirectory(), "config.json");
     private static configPathLEGACY = join(this.dataPath, "config.json");
     private static firstLaunch = !existsSync(this.configPath) && !existsSync(this.configPathLEGACY);
     // Forked processes do not have access to electron, so we have this workaround.
-    private static launcherDir = process.env.CONFIG_DIRECT_PATH ?? require("@electron/remote").app.getPath("userData");
-    public static readonly DistributionURL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json';
+    // TODO: Resolve true path;
+    private static launcherDir = process.env.CONFIG_DIRECT_PATH ?? "";
+    public static readonly distributionURL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json';
     public static readonly launcherName = 'Helios-Launcher'
     public static readonly azureClientId = '1ce6e35a-126f-48fd-97fb-54d143ac6d45'
     /**
@@ -56,7 +92,7 @@ export class ConfigManager {
      * Dynamic = Calculated by a private static function.
      * Resolved = Resolved externally, defaults to null.
      */
-    private static DEFAULT_CONFIG: Config = {
+    private static defaultConfig: Config = {
         settings: {
             game: {
                 resWidth: 1280,
@@ -101,7 +137,7 @@ export class ConfigManager {
      * @returns {string} The absolute path of the launcher's data directory.
      */
     public static getDataDirectory(def = false) {
-        return !def ? this.config.settings.launcher.dataDirectory : this.DEFAULT_CONFIG.settings.launcher.dataDirectory;
+        return !def ? this.config.settings.launcher.dataDirectory : this.defaultConfig.settings.launcher.dataDirectory;
     };
 
     /**
@@ -127,8 +163,8 @@ export class ConfigManager {
     };
 
     /**
- * Save the current configuration to a file.
- */
+     * Save the current configuration to a file.
+     */
     public static save() {
         writeFileSync(this.configPath, JSON.stringify(this.config, null, 4), { encoding: "utf-8" });
     };
@@ -149,26 +185,26 @@ export class ConfigManager {
                 moveSync(this.configPathLEGACY, this.configPath);
             } else {
                 doLoad = false;
-                this.config = this.DEFAULT_CONFIG;
-                exports.save();
+                this.config = this.defaultConfig;
+                this.save();
             }
         }
         if (doLoad) {
             let doValidate = false;
             try {
-                this.config = JSON.parse(readFileSync(this.configPath, { encoding: "utf-8" }));
+                this.config = JSON.parse(readFileSync(this.configPath, { encoding: "utf-8" })) as Config;
                 doValidate = true;
             } catch (err) {
                 logger.error(err);
                 logger.info("Configuration file contains malformed JSON or is corrupt.");
                 logger.info("Generating a new configuration file.");
                 ensureDirSync(join(this.configPath, ".."));
-                this.config = this.DEFAULT_CONFIG;
-                exports.save();
+                this.config = this.defaultConfig;
+                this.save();
             }
             if (doValidate) {
-                this.config = this.validateKeySet(this.DEFAULT_CONFIG, this.config);
-                exports.save();
+                this.config = this.validateKeySet<Config>(this.defaultConfig, this.config);
+                this.save();
             }
         }
         logger.info("Successfully Loaded");
@@ -244,7 +280,7 @@ export class ConfigManager {
      * @returns {string} The launcher's common directory.
      */
     public static get commonDirectory() {
-        return join(exports.getDataDirectory(), "common");
+        return join(this.getDataDirectory(), "common");
     };
 
     /**
@@ -254,7 +290,7 @@ export class ConfigManager {
      * @returns {string} The launcher's instance directory.
      */
     public static get instanceDirectory() {
-        return join(exports.getDataDirectory(), "instances");
+        return join(this.getDataDirectory(), "instances");
     };
 
     /**
@@ -283,7 +319,7 @@ export class ConfigManager {
      * @returns {string} The ID of the selected serverpack.
      */
     public static getSelectedServer(def = false) {
-        return !def ? this.config.selectedServer : this.DEFAULT_CONFIG.clientToken;
+        return !def ? this.config.selectedServer : this.defaultConfig.clientToken;
     };
 
     /**
@@ -311,8 +347,8 @@ export class ConfigManager {
      * @param {string} uuid The uuid of the authenticated account.
      * @returns {Object} The authenticated account with the given uuid.
      */
-    public static getAuthAccountByUuid(uuid: string) {
-        return this.config.authenticationDatabase[uuid];
+    public static getAuthAccountByUuid<T extends 'mojang' | 'microsoft'>(uuid: string): AuthData<T> {
+        return this.config.authenticationDatabase[uuid] as AuthData<T>;
     };
 
     /**
@@ -341,12 +377,15 @@ export class ConfigManager {
      */
     public static addMojangAuthAccount(uuid: string, accessToken: string, username: string, displayName: string) {
         this.config.selectedAccount = uuid;
-        this.config.authenticationDatabase[uuid] = {
+        (this.config.authenticationDatabase[uuid] as AuthData<'mojang'>) = {
             type: "mojang",
             accessToken,
             username: username.trim(),
             uuid: uuid.trim(),
             displayName: displayName.trim(),
+            expiresAt: undefined,
+            microsoft: undefined,
+
         };
         return this.config.authenticationDatabase[uuid];
     };
@@ -363,12 +402,12 @@ export class ConfigManager {
      *
      * @returns {Object} The authenticated account object created by this action.
      */
-    public static updateMicrosoftAuthAccount(uuid: string, accessToken: string, msAccessToken: string, msRefreshToken: string, msExpires: string, mcExpires: string) {
+    public static updateMicrosoftAuthAccount(uuid: string, accessToken: string, msAccessToken: string, msRefreshToken: string, msExpires: Date, mcExpires: Date) {
         this.config.authenticationDatabase[uuid].accessToken = accessToken;
-        this.config.authenticationDatabase[uuid].expiresAt = mcExpires;
-        this.config.authenticationDatabase[uuid].microsoft.access_token = msAccessToken;
-        this.config.authenticationDatabase[uuid].microsoft.refresh_token = msRefreshToken;
-        this.config.authenticationDatabase[uuid].microsoft.expires_at = msExpires;
+        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).expiresAt = mcExpires;
+        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.access_token = msAccessToken;
+        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.refresh_token = msRefreshToken;
+        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.expires_at = msExpires;
         return this.config.authenticationDatabase[uuid];
     };
 
@@ -389,10 +428,10 @@ export class ConfigManager {
         uuid: string,
         accessToken: string,
         name: string,
-        mcExpires: string,
+        mcExpires: Date,
         msAccessToken: string,
         msRefreshToken: string,
-        msExpires: string
+        msExpires: Date
     ) {
         this.config.selectedAccount = uuid;
         this.config.authenticationDatabase[uuid] = {
@@ -403,8 +442,11 @@ export class ConfigManager {
             displayName: name.trim(),
             expiresAt: mcExpires,
             microsoft: {
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 access_token: msAccessToken,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 refresh_token: msRefreshToken,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 expires_at: msExpires,
             },
         };
@@ -428,7 +470,7 @@ export class ConfigManager {
                 if (keys.length > 0) {
                     this.config.selectedAccount = keys[0];
                 } else {
-                    this.config.selectedAccount = null;
+                    this.config.selectedAccount = undefined;
                     this.config.clientToken = undefined;
                 }
             }
@@ -442,8 +484,8 @@ export class ConfigManager {
      *
      * @returns {Object} The selected authenticated account.
      */
-    public static getSelectedAccount() {
-        return this.config.authenticationDatabase[this.config.selectedAccount];
+    public static get selectedAccount() {
+        return this.config.selectedAccount ? this.config.authenticationDatabase[this.config.selectedAccount] : undefined;
     };
 
     /**
@@ -487,11 +529,10 @@ export class ConfigManager {
      * @returns {Object} The mod configuration for the given server.
      */
     public static getModConfigurationForServer(serverid: string) {
-        const cfgs = this.config.modConfigurations;
-        for (let i = 0; i < cfgs.length; i++) {
-            if (cfgs[i].id === serverid) {
-                return cfgs[i];
-            }
+        const configs = this.config.modConfigurations;
+
+        for (const config of configs) {
+            if (config.id === serverid) return config;
         }
         return null;
     };
@@ -502,19 +543,20 @@ export class ConfigManager {
      * @param {string} serverid The id of the server for the given mod configuration.
      * @param {Object} configuration The mod configuration for the given server.
      */
-    public static setModConfigurationForServer(serverid: string, configuration) {
-        const cfgs = this.config.modConfigurations;
-        for (let i = 0; i < cfgs.length; i++) {
-            if (cfgs[i].id === serverid) {
-                cfgs[i] = configuration;
+    public static setModConfigurationForServer(serverid: string, configuration: ModConfig) {
+        const configs = this.config.modConfigurations;
+
+        for (let i = 0; i < configs.length; i++) {
+            if (configs[i].id === serverid) {
+                this.config.modConfigurations[i] = configuration;
                 return;
             }
         }
-        cfgs.push(configuration);
+        configs.push(configuration);
     };
 
 
-    ///////////////////////////////////// JAVA CONFIG ////////////////////////////////////////////
+    /// ////////////////////////////////// JAVA CONFIG ///////////////////////////////////////// ///
 
 
     // User Configurable Settings
@@ -637,7 +679,7 @@ export class ConfigManager {
      * @returns {number} The width of the game window.
      */
     public static getGameWidth(def = false) {
-        return !def ? this.config.settings.game.resWidth : this.DEFAULT_CONFIG.settings.game.resWidth;
+        return !def ? this.config.settings.game.resWidth : this.defaultConfig.settings.game.resWidth;
     };
 
     /**
@@ -668,7 +710,7 @@ export class ConfigManager {
      * @returns {number} The height of the game window.
      */
     public static getGameHeight(def = false) {
-        return !def ? this.config.settings.game.resHeight : this.DEFAULT_CONFIG.settings.game.resHeight;
+        return !def ? this.config.settings.game.resHeight : this.defaultConfig.settings.game.resHeight;
     };
 
     /**
@@ -699,7 +741,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the game is set to launch in fullscreen mode.
      */
     public static getFullscreen(def = false) {
-        return !def ? this.config.settings.game.fullscreen : this.DEFAULT_CONFIG.settings.game.fullscreen;
+        return !def ? this.config.settings.game.fullscreen : this.defaultConfig.settings.game.fullscreen;
     };
 
     /**
@@ -718,7 +760,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the game should auto connect to servers.
      */
     public static getAutoConnect(def = false) {
-        return !def ? this.config.settings.game.autoConnect : this.DEFAULT_CONFIG.settings.game.autoConnect;
+        return !def ? this.config.settings.game.autoConnect : this.defaultConfig.settings.game.autoConnect;
     };
 
     /**
@@ -737,7 +779,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the game will launch as a detached process.
      */
     public static getLaunchDetached(def = false) {
-        return !def ? this.config.settings.game.launchDetached : this.DEFAULT_CONFIG.settings.game.launchDetached;
+        return !def ? this.config.settings.game.launchDetached : this.defaultConfig.settings.game.launchDetached;
     };
 
     /**
@@ -758,7 +800,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the launcher should download prerelease versions.
      */
     public static getAllowPrerelease(def = false) {
-        return !def ? this.config.settings.launcher.allowPrerelease : this.DEFAULT_CONFIG.settings.launcher.allowPrerelease;
+        return !def ? this.config.settings.launcher.allowPrerelease : this.defaultConfig.settings.launcher.allowPrerelease;
     };
 
     /**
@@ -782,7 +824,6 @@ export class ConfigManager {
         return {
             minRAM: resolveMinRAM(),
             maxRAM: resolveMaxRAM(), // Dynamic
-            executable: null,
             jvmOptions: ["-XX:+UseConcMarkSweepGC", "-XX:+CMSIncrementalMode", "-XX:-UseAdaptiveSizePolicy", "-Xmn128M"],
         };
     }
@@ -791,7 +832,6 @@ export class ConfigManager {
         return {
             minRAM: resolveMinRAM(),
             maxRAM: resolveMaxRAM(), // Dynamic
-            executable: null,
             jvmOptions: ["-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"],
         };
     }
@@ -799,27 +839,35 @@ export class ConfigManager {
     /**
      * Validate that the destination object has at least every field
      * present in the source object. Assign a default value otherwise.
-     *
+     * 
      * @param {Object} srcObj The source object to reference against.
      * @param {Object} destObj The destination object.
      * @returns {Object} A validated destination object.
      */
-    private static validateKeySet(srcObj, destObj) {
-        if (srcObj == null) {
-            srcObj = {};
-        }
+    // TODO: Move to a Util Section
+    private static validateKeySet<T = Config>(srcObj: Record<string, unknown>, destObj: any) {
+        if (srcObj == null) return destObj as T;
+
         const validationBlacklist = ["authenticationDatabase", "javaConfig"];
-        const keys = Object.keys(srcObj);
-        for (let i = 0; i < keys.length; i++) {
-            if (typeof destObj[keys[i]] === "undefined") {
-                destObj[keys[i]] = srcObj[keys[i]];
-            } else if (typeof srcObj[keys[i]] === "object" && srcObj[keys[i]] != null && !(srcObj[keys[i]] instanceof Array) && validationBlacklist.indexOf(keys[i]) === -1) {
-                destObj[keys[i]] = this.validateKeySet(srcObj[keys[i]], destObj[keys[i]]);
+
+        const keys = Object.keys(srcObj) as (keyof Config)[];
+
+        for (const key of keys) {
+            const srcElement = srcObj[key] ?? undefined;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (typeof destObj[key] === "undefined") {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                destObj[key] = srcElement;
+            }
+
+            else if (typeof srcElement === "object" && srcElement != null && !(srcElement instanceof Array) && validationBlacklist.indexOf(key) === -1) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+                destObj[key] = this.validateKeySet(srcElement as Record<string, unknown>, destObj[key] as Record<string, unknown>);
             }
         }
-        return destObj;
+
+        return destObj as T;
     }
 
 
 }
-

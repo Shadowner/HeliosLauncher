@@ -43,16 +43,16 @@ export class Module {
      * 
      * @return {string} The default extension for the given type.
      */
-    private static resolveDefaultExtension(type) {
+    private static resolveDefaultExtension(type: DistroTypes) {
         switch (type) {
-            case exports.Types.Library:
-            case exports.Types.ForgeHosted:
-            case exports.Types.LiteLoader:
-            case exports.Types.ForgeMod:
+            case DistroTypes.Library:
+            case DistroTypes.ForgeHosted:
+            case DistroTypes.LiteLoader:
+            case DistroTypes.ForgeMod:
                 return 'jar'
-            case exports.Types.LiteMod:
+            case DistroTypes.LiteMod:
                 return 'litemod'
-            case exports.Types.File:
+            case DistroTypes.File:
             default:
                 return 'jar' // There is no default extension really.
         }
@@ -126,23 +126,23 @@ export class Module {
         }
     }
 
-    private resolveArtifactPath(artifactPath: string, serverid) {
-        const pth = artifactPath == null ? join(...this.artifactGroup.split('.'), this.artifactID, this.artifactVersion, `${this.artifactID}-${this.artifactVersion}${this.artifactClassifier != undefined ? `-${this.artifactClassifier}` : ''}.${this.artifactExt}`) : artifactPath
+    private resolveArtifactPath(artifactPath: string, serverid: string) {
+        const pth = artifactPath == null ? join(...this.artifactGroup.split('.'), this.artifactID, this.artifactVersion, `${this.artifactID}-${this.artifactVersion}${this.artifactClassifier ? `-${this.artifactClassifier}` : ''}.${this.artifactExt}`) : artifactPath
 
         switch (this.type) {
-            case exports.Types.Library:
-            case exports.Types.ForgeHosted:
-            case exports.Types.LiteLoader:
+            case DistroTypes.Library:
+            case DistroTypes.ForgeHosted:
+            case DistroTypes.LiteLoader:
                 this.artifact.path = join(ConfigManager.commonDirectory, 'libraries', pth)
                 break
-            case exports.Types.ForgeMod:
-            case exports.Types.LiteMod:
+            case DistroTypes.ForgeMod:
+            case DistroTypes.LiteMod:
                 this.artifact.path = join(ConfigManager.commonDirectory, 'modstore', pth)
                 break
-            case exports.Types.VersionManifest:
+            case DistroTypes.VersionManifest:
                 this.artifact.path = join(ConfigManager.commonDirectory, 'versions', this.identifier, `${this.identifier}.json`)
                 break
-            case exports.Types.File:
+            case DistroTypes.File:
             default:
                 this.artifact.path = join(ConfigManager.instanceDirectory, serverid, pth)
                 break
@@ -150,12 +150,12 @@ export class Module {
 
     }
 
-    private resolveSubModules(json, serverid) {
-        if (json == null) return;
+    private resolveSubModules(jsonSubModules: IModule[], serverid: string) {
+        if (jsonSubModules == null) return;
 
         const subModules: Module[] = []
-        for (let sm of json) {
-            subModules.push(Module.fromJSON(sm, serverid))
+        for (const subModule of jsonSubModules) {
+            subModules.push(Module.fromJSON(subModule, serverid))
         }
         this.subModules = subModules
     }

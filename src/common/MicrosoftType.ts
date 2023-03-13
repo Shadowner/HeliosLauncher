@@ -1,8 +1,10 @@
-import { ConfigManager } from './manager/ConfigManager';
 // NOTE FOR THIRD-PARTY
 // REPLACE THIS CLIENT ID WITH YOUR APPLICATION ID.
+
+import { ConfigManager } from "../frontend/manager/ConfigManager";
+
 // SEE https://github.com/dscalzi/HeliosLauncher/blob/master/docs/MicrosoftAuth.md
-exports.AZURE_CLIENT_ID = ConfigManager.azureClientId;
+export const AZURE_CLIENT_ID = ConfigManager.azureClientId;
 // SEE NOTE ABOVE.
 
 

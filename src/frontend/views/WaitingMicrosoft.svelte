@@ -1,11 +1,9 @@
-<script>
+<script lang="ts">
+  import { ipcRenderer } from "electron";
   import { fade } from "svelte/transition";
-  import { currentView } from "../store/AppStore";
-  import { PossibleViewState } from "../types/PossibleAppState";
+  import { MSFT_OPCODE } from "../../common/MicrosoftType";
 
-  setTimeout(() => {
-    currentView.set(PossibleViewState.Landing);
-  }, 750);
+  ipcRenderer.send(MSFT_OPCODE.OPEN_LOGIN);
 </script>
 
 <div id="waitingContainer" class="absolute" in:fade="{{ delay: 500 }}" out:fade>

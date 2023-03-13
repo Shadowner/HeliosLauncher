@@ -9,7 +9,11 @@
     "checkJs": true,
     "isolatedModules": true,
     "composite": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "paths": {
+      "@/common": ["src/common"],
+      "@/components": ["src/frontend/components"]
+    }
   },
   "include": [
     "vite.config.ts",

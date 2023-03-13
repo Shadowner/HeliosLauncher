@@ -1,12 +1,13 @@
 import ElectronStore from "electron-store";
+import { IDistroIndex } from '../../frontend/models/DistroIndex';
 
-interface ISettings {
-  check: boolean;
-}
 
-const settings = new ElectronStore<ISettings>({
+
+const settings = new ElectronStore<IDistroIndex>({
   defaults: {
-    check: false,
+    servers: [],
+    rss: "",
+    version: "",
   },
 });
 
