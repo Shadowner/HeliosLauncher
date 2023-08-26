@@ -19,7 +19,7 @@
 
   export let showNews = false;
   let hasError = false;
-  let news: News[] = [];
+  const news: News[] = [];
   let loading = true;
   let currentNewIndex = -1;
   $: displayedValue = news[currentNewIndex];

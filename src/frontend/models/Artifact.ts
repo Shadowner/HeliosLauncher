@@ -4,7 +4,7 @@
  */
 
 export interface IArtifact {
-    MD5: string,
+    md5: string,
     size: string,
     url: string,
     path: string,
@@ -20,17 +20,17 @@ export class Artifact {
      * @returns {Artifact} The parsed Artifact.
      */
     public static fromJSON(json: IArtifact) {
-        return new Artifact(json.MD5, json.size, json.url, json.path)
+        return new Artifact(json.md5, json.size, json.url, json.path);
     }
 
     constructor(
-        public MD5: string,
+        public md5: string,
         public size: string,
         public url: string,
         public path: string,
     ) { }
 
-    //TODO: Remove those property
+    // TODO: Remove those property
 
     /**
      * Get the MD5 hash of the artifact. This value may
@@ -40,28 +40,28 @@ export class Artifact {
      * @returns {string} The MD5 hash of the Artifact or undefined.
      */
     public getHash() {
-        return this.MD5
+        return this.md5;
     }
 
     /**
      * @returns {number} The download size of the artifact.
      */
     public getSize() {
-        return this.size
+        return this.size;
     }
 
     /**
      * @returns {string} The download url of the artifact.
      */
     public getURL() {
-        return this.url
+        return this.url;
     }
 
     /**
      * @returns {string} The artifact's destination path.
      */
     public getPath() {
-        return this.path
+        return this.path;
     }
 
 }

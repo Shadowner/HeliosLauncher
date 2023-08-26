@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "fs-extra"
+import { readFile, writeFile } from "fs-extra";
 import { LoggerUtil } from "helios-core/.";
 import { DevUtil } from '../util/DevUtil';
 import { ConfigManager } from "./ConfigManager";
@@ -6,7 +6,7 @@ import { join } from 'path';
 import { DistroIndex, IDistroIndex } from '../models/DistroIndex';
 import fetch from 'node-fetch';
 
-const logger = LoggerUtil.getLogger('DistroManager')
+const logger = LoggerUtil.getLogger('DistroManager');
 // eslint-disable-next-line no-shadow
 export enum DistroTypes {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -30,21 +30,21 @@ export enum DistroTypes {
 export class DistroManager {
 
     public static distribution?: DistroIndex;
-    private static readonly distroPath = join(ConfigManager.getLauncherDirectory(), 'distribution.json')
-    private static readonly devPath = join(ConfigManager.getLauncherDirectory(), 'dev_distribution.json')
+    private static readonly distroPath = join(ConfigManager.getLauncherDirectory(), 'distribution.json');
+    private static readonly devPath = join(ConfigManager.getLauncherDirectory(), 'dev_distribution.json');
 
     /**
      * @returns {Promise.<DistroIndex>}
      */
     public static async pullRemote() {
-        if (DevUtil.IsDev) return this.pullLocal();
+        if (DevUtil.isDev) return this.pullLocal();
 
-        const distroDest = join(ConfigManager.getLauncherDirectory(), 'distribution.json')
+        const distroDest = join(ConfigManager.getLauncherDirectory(), 'distribution.json');
         const response = await fetch(ConfigManager.distributionURL, { signal: AbortSignal.timeout(2500) });
         this.distribution = DistroIndex.fromJSON(await response.json() as IDistroIndex);
 
         writeFile(distroDest, JSON.stringify(this.distribution), 'utf-8').catch(e => {
-            logger.warn("Failed to save local distribution.json")
+            logger.warn("Failed to save local distribution.json");
             logger.warn(e);
         });
 
@@ -56,7 +56,7 @@ export class DistroManager {
      */
     // TODO: Change this to fetch it from the electron store with IPCRenderer
     public static async pullLocal() {
-        const file = await readFile(DevUtil.IsDev ? this.devPath : this.distroPath, 'utf-8');
+        const file = await readFile(DevUtil.isDev ? this.devPath : this.distroPath, 'utf-8');
         this.distribution = DistroIndex.fromJSON(JSON.parse(file) as IDistroIndex);
         return this.distribution;
 
@@ -64,11 +64,11 @@ export class DistroManager {
 
     public static setDevMode(value: boolean) {
         if (value) {
-            logger.info('Developer mode enabled.')
-            logger.info('If you don\'t know what that means, revert immediately.')
+            logger.info('Developer mode enabled.');
+            logger.info('If you don\'t know what that means, revert immediately.');
         } else {
-            logger.info('Developer mode disabled.')
+            logger.info('Developer mode disabled.');
         }
-        DevUtil.IsDev = value
+        DevUtil.isDev = value;
     }
 }

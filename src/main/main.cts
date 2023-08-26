@@ -27,14 +27,10 @@ const createWindow = () => {
         height: 552,
         frame: false,
         webPreferences: {
-            // preload: join(__dirname, 'app', 'assets', 'js', 'preloader.js'),
-            // devTools: isProd ? false : true,
-            devTools: true,
-
-            // Make that false some day.
-            nodeIntegration: true,
-            contextIsolation: false
+            preload: join(__dirname, "../preload/index.js"),
+            sandbox: false,
         },
+        autoHideMenuBar: true,
         backgroundColor: '#171614'
     });
 

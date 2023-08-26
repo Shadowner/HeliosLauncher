@@ -1,5 +1,6 @@
 {
   "compileOnSave": true,
+
   "compilerOptions": {
     "outDir": "../../build/electron",
     "target": "es2020",
@@ -23,6 +24,5 @@
     "esModuleInterop": true,
     "isolatedModules": true
   },
-  "include": ["."],
-  "exclude": ["node_modules"]
+  "include": [".", "./utils/**/*", "../preload"]
 }

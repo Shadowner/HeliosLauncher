@@ -4,8 +4,9 @@ export interface IAsset {
     id: string,
     hash: string,
     size: number,
-    from: string,
-    to: string
+    from: string | { url: string },
+    to: string,
+    type?: string
 }
 
 export class Asset {
@@ -22,8 +23,8 @@ export class Asset {
         public id: string,
         public hash: string,
         public size: number,
-        public from: string,
-        public to: string
+        public from: string | { url: string },
+        public to: string,
     ) {
     }
 }

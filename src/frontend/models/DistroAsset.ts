@@ -1,4 +1,4 @@
-import { Asset } from "./Asset"
+import { Asset } from "./Asset";
 import { DistroTypes } from '../manager/DistroManager';
 
 export class DistroAsset extends Asset {
@@ -15,15 +15,15 @@ export class DistroAsset extends Asset {
      * @param {string} to The absolute local file path of the asset.
      * @param {string} type The the module type.
      */
-    constructor(public id: any,
+    constructor(public id: string,
         hash: string,
         size: number,
         from: string,
         to: string,
         public type: DistroTypes
     ) {
-        super(id, hash, size, from, to)
-        this.type = type
+        super(id, hash, size, from, to);
+        this.type = type;
     }
 
 }

@@ -12,7 +12,7 @@ export class MinecraftUtil {
         const act = actual.split(".");
 
         for (let i = 0; i < des.length; i++) {
-            if (!(parseInt(act[i]) >= parseInt(des[i]))) {
+            if (!(Number(act[i]) >= Number(des[i]))) {
                 return false;
             }
         }
@@ -24,38 +24,38 @@ export class MinecraftUtil {
         if (this.mcVersionAtLeast('1.13', mcVersion)) return true;
 
         try {
-            const forgeVer = forgeVersion.split('-')[1]
-            const maxFG2 = [14, 23, 5, 2847]
-            const verSplit = forgeVer.split('.').map(v => Number(v))
+            const forgeVer = forgeVersion.split('-')[1];
+            const maxFG2 = [14, 23, 5, 2847];
+            const verSplit = forgeVer.split('.').map(v => Number(v));
 
             for (let i = 0; i < maxFG2.length; i++) {
                 if (verSplit[i] > maxFG2[i]) {
-                    return true
+                    return true;
                 } else if (verSplit[i] < maxFG2[i]) {
-                    return false
+                    return false;
                 }
             }
-            return false
+            return false;
         } catch (err) {
-            throw new Error('Forge version is complex (changed).. launcher requires a patch.')
+            throw new Error('Forge version is complex (changed).. launcher requires a patch.');
         }
     }
 
     public static isAutoconnectBroken(forgeVersion: string) {
-        const minWorking = [31, 2, 15]
-        const verSplit = forgeVersion.split('.').map(v => Number(v))
+        const minWorking = [31, 2, 15];
+        const verSplit = forgeVersion.split('.').map(v => Number(v));
 
         if (verSplit[0] === 31) {
             for (let i = 0; i < minWorking.length; i++) {
                 if (verSplit[i] > minWorking[i]) {
-                    return false
+                    return false;
                 } else if (verSplit[i] < minWorking[i]) {
-                    return true
+                    return true;
                 }
             }
         }
 
-        return false
+        return false;
     }
 
 }

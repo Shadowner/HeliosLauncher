@@ -26,7 +26,7 @@ export class Server {
      */
     public static fromJSON(json: IServer) {
 
-        const modules = json.modules
+        const modules = json.modules;
 
         const serv = new Server(
             json.id,
@@ -38,10 +38,10 @@ export class Server {
             json.minecraftVersion,
             json.isMainServer,
             json.autoconnect
-        )
-        serv.resolveModules(modules)
+        );
+        serv.resolveModules(modules);
 
-        return serv
+        return serv;
     }
 
 
@@ -60,11 +60,11 @@ export class Server {
 
     // TODO: Put this in the constructor
     private resolveModules(jsonModule: IModule[]) {
-        const modules: Module[] = []
+        const modules: Module[] = [];
         for (const module of jsonModule) {
-            modules.push(Module.fromJSON(module, this.id))
+            modules.push(Module.fromJSON(module, this.id));
         }
-        this.modules = modules
+        this.modules = modules;
     }
 
 }

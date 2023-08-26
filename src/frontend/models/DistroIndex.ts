@@ -20,10 +20,10 @@ export class DistroIndex {
             json.version,
             json.rss,
             json.servers
-        )
+        );
     }
 
-    public servers: Server[] = []
+    public servers: Server[] = [];
     public get mainServer() {
         return this.servers.find(x => x.isMainServer)?.id ?? this.servers[0].id ?? null;
     }
@@ -41,11 +41,11 @@ export class DistroIndex {
     }
 
     private resolveServers(serverJsons: IServer[]) {
-        const servers: Server[] = []
-        for (let serverJson of serverJsons) {
-            servers.push(Server.fromJSON(serverJson))
+        const servers: Server[] = [];
+        for (const serverJson of serverJsons) {
+            servers.push(Server.fromJSON(serverJson));
         }
-        this.servers = servers
+        this.servers = servers;
     }
 
 }

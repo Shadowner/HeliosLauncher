@@ -4,8 +4,8 @@
  */
 
 export interface IRequired {
-    value: any,
-    def: any,
+    value: boolean,
+    def: boolean,
 }
 
 export class Required {
@@ -19,16 +19,16 @@ export class Required {
      */
     public static fromJSON(json: IRequired) {
         if (json == null) {
-            return new Required(true, true)
+            return new Required(true, true);
         } else {
-            return new Required(json.value == null ? true : json.value, json.def == null ? true : json.def)
+            return new Required(json.value == null ? true : json.value, json.def == null ? true : json.def);
         }
     }
 
-    public default: any;
+    public default: boolean;
     constructor(
-        public value: any,
-        def: any
+        public value: boolean,
+        def: boolean
     ) {
         this.default = def;
     }
@@ -41,14 +41,14 @@ export class Required {
      * @returns {boolean} The default enabled value.
      */
     public get isDefault() {
-        return this.default
+        return this.default;
     }
 
     /**
      * @returns {boolean} Whether or not the module is required.
      */
     public get isRequired(): boolean {
-        return this.value
+        return this.value;
     }
 
 }

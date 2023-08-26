@@ -1,9 +1,8 @@
 import ElectronStore from "electron-store";
-import { IDistroIndex } from '../../frontend/models/DistroIndex';
 
 
 
-const settings = new ElectronStore<IDistroIndex>({
+const settings = new ElectronStore({
   defaults: {
     servers: [],
     rss: "",

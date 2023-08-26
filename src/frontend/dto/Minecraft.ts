@@ -20,7 +20,7 @@ export type MinecraftGameVersionManifest = {
     minimumLauncherVersion: number,
     releaseTime: Date,
     time: Date,
-    //Could be more precise I think
+    // Could be more precise I think
     type: string
     assets: string,
     complianceLevel: number,
@@ -38,8 +38,10 @@ export type MinecraftGameVersionManifest = {
     downloads:
     {
         client: MinecraftFileInfo
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         client_mappings: MinecraftFileInfo
         server: MinecraftFileInfo,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         server_mappings: MinecraftFileInfo
     },
     javaVersion: { component: string, majorVersion: number },

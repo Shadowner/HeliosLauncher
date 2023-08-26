@@ -13,7 +13,7 @@ export class Library extends Asset {
             case "win32":
                 return 'windows';
             default:
-                return 'unknown_os'
+                return 'unknown_os';
         }
     }
 
@@ -36,19 +36,19 @@ export class Library extends Asset {
             return natives ? natives[Library.mojangFriendlyOS()] != null : true;
         }
 
-        for (let rule of rules) {
-            const action = rule.action
-            const osProp = rule.os
+        for (const rule of rules) {
+            const action = rule.action;
+            const osProp = rule.os;
             if (action != null && osProp != null) {
-                const osName = osProp.name
-                const osMoj = Library.mojangFriendlyOS()
+                const osName = osProp.name;
+                const osMoj = Library.mojangFriendlyOS();
                 if (action === 'allow') {
-                    return osName === osMoj
+                    return osName === osMoj;
                 } else if (action === 'disallow') {
-                    return osName !== osMoj
+                    return osName !== osMoj;
                 }
             }
         }
-        return true
+        return true;
     }
 }

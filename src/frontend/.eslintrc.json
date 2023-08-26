@@ -28,6 +28,7 @@
     "svelte3/typescript": true
   },
   "rules": {
+    "semi": "warn",
     "@typescript-eslint/adjacent-overload-signatures": "error",
     "@typescript-eslint/array-type": [
       "error",
@@ -154,6 +155,7 @@
     "no-undef-init": "error",
     "no-underscore-dangle": "error",
     "no-unsafe-finally": "error",
+    "@typescript-eslint/no-unsafe-call": "off",
     "no-unused-labels": "error",
     "no-var": "error",
     "object-shorthand": "error",

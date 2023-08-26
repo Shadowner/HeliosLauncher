@@ -3,13 +3,13 @@ import { LoggerUtil } from 'helios-core/.';
 import { DevUtil } from '../util/DevUtil';
 import { join } from 'path';
 import { existsSync, pathExists, readdir } from 'fs-extra';
-import Registry from "winreg";
+import Registry, { Registry as IRegistry } from "winreg";
 import { MinecraftUtil } from '../util/MinecraftUtil';
 import { exec } from "child_process";
 import nodeDiskInfo from "node-disk-info";
 import fetch from "node-fetch";
-import { AdoptiumBinary, JavaMetaObject, JavaRuntimeVersion } from '../util/JavaType';
-
+import { AdoptiumBinary, JavaMetaObject, JavaRuntimeVersion } from '../types/JavaType';
+import { promisify } from "util";
 
 const logger = LoggerUtil.getLogger("JavaGuard");
 
@@ -33,19 +33,18 @@ export class JavaGuard extends EventEmitter {
     }
 
     private static async latestAdoptium(major: string) {
-        const majorNum = Number(major)
-        const sanitizedOS = process.platform === 'win32' ? 'windows' : (process.platform === 'darwin' ? 'mac' : process.platform)
-        const url = `https://api.adoptium.net/v3/assets/latest/${major}/hotspot?vendor=eclipse`
+        const majorNum = Number(major);
+        const sanitizedOS = process.platform === 'win32' ? 'windows' : (process.platform === 'darwin' ? 'mac' : process.platform);
+        const url = `https://api.adoptium.net/v3/assets/latest/${major}/hotspot?vendor=eclipse`;
 
-        const response = await fetch(url).catch(_e => { logger.error(_e); return null });
-        if (!response) return null;
-        const json = await response.json() as AdoptiumBinary[]
+        const response = await fetch(url);
+        const json = await response.json() as AdoptiumBinary[];
 
         const targetBinary = json.find(entry => {
             return entry.version.major === majorNum
                 && entry.binary.os === sanitizedOS
                 && entry.binary.image_type === 'jdk'
-                && entry.binary.architecture === 'x64'
+                && entry.binary.architecture === 'x64';
         });
 
         return targetBinary ?
@@ -54,41 +53,42 @@ export class JavaGuard extends EventEmitter {
                 size: targetBinary.binary.package.size,
                 name: targetBinary.binary.package.name
             }
-            : null
+            : null;
     }
 
     private static async latestCorretto(major: string) {
-        let sanitizedOS: string, ext: string;
+        let sanitizedOS: string;
+        let ext: string;
         switch (process.platform) {
             case 'win32':
-                sanitizedOS = 'windows'
-                ext = 'zip'
-                break
+                sanitizedOS = 'windows';
+                ext = 'zip';
+                break;
             case 'darwin':
-                sanitizedOS = 'macos'
-                ext = 'tar.gz'
-                break
+                sanitizedOS = 'macos';
+                ext = 'tar.gz';
+                break;
             case 'linux':
-                sanitizedOS = 'linux'
-                ext = 'tar.gz'
-                break
+                sanitizedOS = 'linux';
+                ext = 'tar.gz';
+                break;
             default:
-                sanitizedOS = process.platform
-                ext = 'tar.gz'
-                break
+                sanitizedOS = process.platform;
+                ext = 'tar.gz';
+                break;
         }
 
-        const arch = DevUtil.isARM64 ? 'aarch64' : 'x64'
-        const url = `https://corretto.aws/downloads/latest/amazon-corretto-${major}-${arch}-${sanitizedOS}-jdk.${ext}`
+        const arch = DevUtil.isARM64 ? 'aarch64' : 'x64';
+        const url = `https://corretto.aws/downloads/latest/amazon-corretto-${major}-${arch}-${sanitizedOS}-jdk.${ext}`;
 
-        const response = await fetch(url).catch(e => { logger.error(e); return null; });
+        const response = await fetch(url);
         if (!response) return null;
 
         return {
             uri: url,
             size: Number(response.headers.get("content-length")),
             name: url.substring(url.lastIndexOf('/') + 1)
-        }
+        };
     }
 
     /**
@@ -98,15 +98,15 @@ export class JavaGuard extends EventEmitter {
      * @param {string} rootDir The root directory of the Java installation.
      * @returns {string} The path to the Java executable.
      */
-    public static javaExecFromRoot(rootDir) {
+    public static javaExecFromRoot(rootDir: string) {
         if (process.platform === 'win32') {
-            return join(rootDir, 'bin', 'javaw.exe')
+            return join(rootDir, 'bin', 'javaw.exe');
         } else if (process.platform === 'darwin') {
-            return join(rootDir, 'Contents', 'Home', 'bin', 'java')
+            return join(rootDir, 'Contents', 'Home', 'bin', 'java');
         } else if (process.platform === 'linux') {
-            return join(rootDir, 'bin', 'java')
+            return join(rootDir, 'bin', 'java');
         }
-        return rootDir
+        return rootDir;
     }
 
     /**
@@ -117,16 +117,16 @@ export class JavaGuard extends EventEmitter {
      */
     public static isJavaExecPath(pth: string) {
         if (pth == null) {
-            return false
+            return false;
         }
         if (process.platform === 'win32') {
-            return pth.endsWith(join('bin', 'javaw.exe'))
+            return pth.endsWith(join('bin', 'javaw.exe'));
         } else if (process.platform === 'darwin') {
-            return pth.endsWith(join('bin', 'java'))
+            return pth.endsWith(join('bin', 'java'));
         } else if (process.platform === 'linux') {
-            return pth.endsWith(join('bin', 'java'))
+            return pth.endsWith(join('bin', 'java'));
         }
-        return false
+        return false;
     }
 
 
@@ -138,7 +138,7 @@ export class JavaGuard extends EventEmitter {
      * @returns {Promise.<Object>} Promise which resolves to Mojang's launcher.json object.
      */
     public static async loadMojangLauncherData() {
-        const response = await fetch('https://launchermeta.mojang.com/mc/launcher.json').catch(e => { logger.error(e); return null });
+        const response = await fetch('https://launchermeta.mojang.com/mc/launcher.json');
         if (!response) return null;
 
         return response.json();
@@ -153,10 +153,10 @@ export class JavaGuard extends EventEmitter {
      * @returns Object containing the version information.
      */
     static parseJavaRuntimeVersion(versionString: string): JavaRuntimeVersion {
-        const major = versionString.split('.')[0]
-        return major == "1" ?
-            JavaGuard.parseJavaRuntimeVersion_8(versionString)
-            : JavaGuard.parseJavaRuntimeVersion_9(versionString)
+        const major = versionString.split('.')[0];
+        return major === "1" ?
+            JavaGuard.parseJavaRuntimeVersion8(versionString)
+            : JavaGuard.parseJavaRuntimeVersion9(versionString);
     }
 
     /**
@@ -166,16 +166,16 @@ export class JavaGuard extends EventEmitter {
      * @param {string} versionString Full version string to parse.
      * @returns Object containing the version information.
      */
-    public static parseJavaRuntimeVersion_8(versionString: string) {
+    public static parseJavaRuntimeVersion8(versionString: string) {
         // 1.{major}.0_{update}-b{build}
         // ex. 1.8.0_152-b16
-        let pts = versionString.split('-')
-        const build = parseInt(pts[1].substring(1))
+        let pts = versionString.split('-');
+        const build = Number(pts[1].substring(1));
 
-        pts = pts[0].split('_')
+        pts = pts[0].split('_');
 
-        const update = parseInt(pts[1])
-        const major = parseInt(pts[0].split('.')[1])
+        const update = Number(pts[1]);
+        const major = Number(pts[0].split('.')[1]);
 
         return {
             build,
@@ -183,7 +183,7 @@ export class JavaGuard extends EventEmitter {
             major,
             minor: undefined,
             revision: undefined
-        }
+        };
     }
 
     /**
@@ -193,23 +193,23 @@ export class JavaGuard extends EventEmitter {
      * @param {string} verString Full version string to parse.
      * @returns Object containing the version information.
      */
-    public static parseJavaRuntimeVersion_9(verString: string) {
+    public static parseJavaRuntimeVersion9(verString: string) {
         // {major}.{minor}.{revision}+{build}
         // ex. 10.0.2+13
-        let pts = verString.split('+')
-        const build = parseInt(pts[1])
+        let pts = verString.split('+');
+        const build = Number(pts[1]);
 
-        pts = pts[0].split('.')
+        pts = pts[0].split('.');
 
-        const major = parseInt(pts[0])
-        const minor = parseInt(pts[1])
-        const revision = parseInt(pts[2])
+        const major = Number(pts[0]);
+        const minor = Number(pts[1]);
+        const revision = Number(pts[2]);
         return {
             build,
             major,
             minor,
             revision
-        }
+        };
     }
 
 
@@ -219,16 +219,12 @@ export class JavaGuard extends EventEmitter {
      * 
      * @returns {string} The path defined by JAVA_HOME, if it exists. Otherwise null.
      */
-    private static scanJavaHome() {
-        const jHome = process.env.JAVA_HOME
+    private static async scanJavaHome() {
+        const jHome = process.env.JAVA_HOME;
         if (!jHome) return null;
-        try {
-            let res = existsSync(jHome)
-            return res ? jHome : null
-        } catch (err) {
-            // Malformed JAVA_HOME property.
-            return null
-        }
+        const test = await pathExists(jHome).catch(e => { return false; });
+        // Malformed JAVA_HOME property.
+        return test ? jHome : null;
     }
 
     /**
@@ -238,106 +234,53 @@ export class JavaGuard extends EventEmitter {
      * @returns {Promise.<Set.<string>>} A promise which resolves to a set of 64-bit Java root
      * paths found in the registry.
      */
-    private static scanRegistry(): Promise<Set<string>> {
-        return new Promise((resolve, _reject) => {
-            // Keys for Java v9.0.0 and later:
-            // 'SOFTWARE\\JavaSoft\\JRE'
-            // 'SOFTWARE\\JavaSoft\\JDK'
-            // Forge does not yet support Java 9, therefore we do not.
+    private static async scanRegistry(): Promise<Set<string>> {
+        // Keys for Java v9.0.0 and later:
+        // 'SOFTWARE\\JavaSoft\\JRE'
+        // 'SOFTWARE\\JavaSoft\\JDK'
+        // Forge does not yet support Java 9, therefore we do not.
 
-            // Keys for Java 1.8 and prior:
-            const regKeys = [
-                '\\SOFTWARE\\JavaSoft\\Java Runtime Environment',
-                '\\SOFTWARE\\JavaSoft\\Java Development Kit'
-            ]
+        // TODO: Check it doesn't break
+        // Keys for Java 1.8 and prior:
+        const regKeys = [
+            '\\SOFTWARE\\JavaSoft\\Java Runtime Environment',
+            '\\SOFTWARE\\JavaSoft\\Java Development Kit'
+        ];
+        const candidates = new Set<string>();
 
-            let keysDone = 0
+        for (const regKeyString of regKeys) {
 
-            const candidates = new Set<string>()
+            const regKey = new Registry({
+                hive: Registry.HKLM,
+                key: regKeyString,
+                arch: 'x64'
+            });
+            // eslint-disable-next-line @typescript-eslint/unbound-method
+            const keyExist = await promisify(regKey.keyExists)();
 
-            for (let i = 0; i < regKeys.length; i++) {
-                const key = new Registry({
-                    hive: Registry.HKLM,
-                    key: regKeys[i],
-                    arch: 'x64'
-                })
-                key.keyExists((err, exists) => {
-                    if (exists) {
-                        key.keys((err, javaVers) => {
-                            if (err) {
-                                keysDone++
-                                console.error(err)
+            if (keyExist) {
+                // eslint-disable-next-line @typescript-eslint/unbound-method
+                const javaVersions: IRegistry[] = await promisify(regKey.keys)().catch((e) => { logger.error(e); return []; });
 
-                                // REG KEY DONE
-                                // DUE TO ERROR
-                                if (keysDone === regKeys.length) {
-                                    resolve(candidates)
-                                }
-                            } else {
-                                if (javaVers.length === 0) {
-                                    // REG KEY DONE
-                                    // NO SUBKEYS
-                                    keysDone++
-                                    if (keysDone === regKeys.length) {
-                                        resolve(candidates)
-                                    }
-                                } else {
+                for (const javaVersion of javaVersions) {
 
-                                    let numDone = 0
+                    const vKey = javaVersion.key.substring(javaVersion.key.lastIndexOf('\\') + 1);
 
-                                    for (let j = 0; j < javaVers.length; j++) {
-                                        const javaVer = javaVers[j]
-                                        const vKey = javaVer.key.substring(javaVer.key.lastIndexOf('\\') + 1)
-                                        // Only Java 8 is supported currently.
-                                        if (parseFloat(vKey) === 1.8) {
-                                            javaVer.get('JavaHome', (err, res) => {
-                                                const jHome = res.value
-                                                if (jHome.indexOf('(x86)') === -1) {
-                                                    candidates.add(jHome)
-                                                }
+                    // Only Java 8 is supported currently.
+                    if (Number(vKey) !== 1.8) continue;
 
-                                                // SUBKEY DONE
+                    // eslint-disable-next-line @typescript-eslint/unbound-method
+                    const javaHome = await promisify(javaVersion.get)("JavaHome").catch(e => { logger.error(e); return ""; });
+                    const javaHomePath = typeof javaHome === "string" ?
+                        javaHome
+                        : javaHome.value;
 
-                                                numDone++
-                                                if (numDone === javaVers.length) {
-                                                    keysDone++
-                                                    if (keysDone === regKeys.length) {
-                                                        resolve(candidates)
-                                                    }
-                                                }
-                                            })
-                                        } else {
-
-                                            // SUBKEY DONE
-                                            // NOT JAVA 8
-
-                                            numDone++
-                                            if (numDone === javaVers.length) {
-                                                keysDone++
-                                                if (keysDone === regKeys.length) {
-                                                    resolve(candidates)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        })
-                    } else {
-
-                        // REG KEY DONE
-                        // DUE TO NON-EXISTANCE
-
-                        keysDone++
-                        if (keysDone === regKeys.length) {
-                            resolve(candidates)
-                        }
-                    }
-                })
+                    if (javaHomePath.indexOf('(x86)') === -1) candidates.add(javaHomePath);
+                }
             }
+        }
 
-        })
-
+        return candidates;
     }
 
     /**
@@ -347,9 +290,9 @@ export class JavaGuard extends EventEmitter {
      */
     private static scanInternetPlugins() {
         // /Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java
-        const pth = '/Library/Internet Plug-Ins/JavaAppletPlugin.plugin'
-        const res = existsSync(JavaGuard.javaExecFromRoot(pth))
-        return res ? pth : null
+        const pth = '/Library/Internet Plug-Ins/JavaAppletPlugin.plugin';
+        const res = existsSync(JavaGuard.javaExecFromRoot(pth));
+        return res ? pth : null;
     }
 
     /**
@@ -359,23 +302,22 @@ export class JavaGuard extends EventEmitter {
      * @returns {Promise.<Set.<string>>} A promise which resolves to a set of the discovered
      * root JVM folders.
      */
-    private static async scanFileSystem(scanDir) {
-        let res = new Set<string>()
-        if (await pathExists(scanDir)) {
+    private static async scanFileSystem(scanDir: string) {
+        const res = new Set<string>();
+        const doesPathExist = await pathExists(scanDir);
+        if (!doesPathExist) return res;
 
-            const files = await readdir(scanDir)
-            for (let i = 0; i < files.length; i++) {
+        const files = await readdir(scanDir);
+        for (const file of files) {
+            const combinedPath = join(scanDir, file);
+            const execPath = JavaGuard.javaExecFromRoot(combinedPath);
 
-                const combinedPath = join(scanDir, files[i])
-                const execPath = JavaGuard.javaExecFromRoot(combinedPath)
-
-                if (await pathExists(execPath)) {
-                    res.add(combinedPath)
-                }
+            if (await pathExists(execPath)) {
+                res.add(combinedPath);
             }
         }
 
-        return res
+        return res;
     }
 
     /**
@@ -387,6 +329,10 @@ export class JavaGuard extends EventEmitter {
      */
     private static sortValidJavaArray(validArr: JavaMetaObject[]) {
         const retArr = validArr.sort((a, b) => {
+            if (!a.execPath || !b.execPath) return -1;
+            if (!a.version.update || !b.version.update) return -1;
+            if (!a.version.revision || !b.version.revision) return -1;
+            if (!a.version.minor || !b.version.minor) return -1;
 
             if (a.version.major === b.version.major) {
 
@@ -394,19 +340,18 @@ export class JavaGuard extends EventEmitter {
                     // Java 8
                     if (a.version.update === b.version.update) {
                         if (a.version.build === b.version.build) {
-
                             // Same version, give priority to JRE.
-                            if (a.execPath!.toLowerCase().indexOf('jdk') > -1) {
-                                return b.execPath!.toLowerCase().indexOf('jdk') > -1 ? 0 : 1
+                            if (a.execPath?.toLowerCase().indexOf('jdk') > -1) {
+                                return b.execPath.toLowerCase().indexOf('jdk') > -1 ? 0 : 1;
                             } else {
-                                return -1
+                                return -1;
                             }
 
                         } else {
-                            return a.version.build > b.version.build ? -1 : 1
+                            return a.version.build > b.version.build ? -1 : 1;
                         }
                     } else {
-                        return a.version.update! > b.version.update! ? -1 : 1
+                        return a.version.update > b.version.update ? -1 : 1;
                     }
                 } else {
                     // Java 9+
@@ -414,97 +359,102 @@ export class JavaGuard extends EventEmitter {
                         if (a.version.revision === b.version.revision) {
 
                             // Same version, give priority to JRE.
-                            if (a.execPath!.toLowerCase().indexOf('jdk') > -1) {
-                                return b.execPath!.toLowerCase().indexOf('jdk') > -1 ? 0 : 1
+                            if (a.execPath.toLowerCase().indexOf('jdk') > -1) {
+                                return b.execPath.toLowerCase().indexOf('jdk') > -1 ? 0 : 1;
                             } else {
-                                return -1
+                                return -1;
                             }
 
                         } else {
-                            return a.version.revision! > b.version.revision! ? -1 : 1
+                            return a.version.revision > b.version.revision ? -1 : 1;
                         }
                     } else {
-                        return a.version.minor! > b.version.minor! ? -1 : 1
+                        return a.version.minor > b.version.minor ? -1 : 1;
                     }
                 }
 
             } else {
-                return a.version.major > b.version.major ? -1 : 1
+                return a.version.major > b.version.major ? -1 : 1;
             }
-        })
+        });
 
-        return retArr
+        return retArr;
     }
 
     constructor(public mcVersion: string) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         super();
-
     }
 
     /**
- * Validates the output of a JVM's properties. Currently validates that a JRE is x64
- * and that the major = 8, update > 52.
- * 
- * @param {string} stderr The output to validate.
- * 
- * @returns {Promise.<Object>} A promise which resolves to a meta object about the JVM.
- * The validity is stored inside the `valid` property.
- */
+     * Validates the output of a JVM's properties. Currently validates that a JRE is x64
+     * and that the major = 8, update > 52.
+     * 
+     * @param {string} stderr The output to validate.
+     * 
+     * @returns {Promise.<Object>} A promise which resolves to a meta object about the JVM.
+     * The validity is stored inside the `valid` property.
+     * 
+     * // TODO: TO refacto 
+     */
     private validateJVMProperties(stderr: string) {
-        const res = stderr
-        const props = res.split('\n')
+        const res = stderr;
+        const props = res.split('\n');
 
-        const goal = 2
-        let checksum = 0
+        const goal = 2;
+        let checksum = 0;
 
-        const meta: any = {}
-
-        for (let i = 0; i < props.length; i++) {
-            if (props[i].indexOf('sun.arch.data.model') > -1) {
-                const arch = props[i].split('=')[1].trim()
-                const parsedArch = parseInt(arch)
-                logger.debug(props[i].trim())
+        const meta: JavaMetaObject = {
+            version: {
+                build: -1,
+                major: -1
+            }
+        };
+        for (const prop of props) {
+            if (prop.indexOf('sun.arch.data.model') > -1) {
+                const arch = prop.split('=')[1].trim();
+                const parsedArch = Number(arch);
+                logger.debug(prop.trim());
 
                 if (parsedArch === 64) {
-                    meta.arch = parsedArch
-                    ++checksum
+                    meta.arch = parsedArch.toString();
+                    ++checksum;
                     if (checksum === goal) break;
                 }
 
-            } else if (props[i].indexOf('java.runtime.version') > -1) {
-                let verString = props[i].split('=')[1].trim()
-                logger.debug(props[i].trim())
-                const objectVersion = JavaGuard.parseJavaRuntimeVersion(verString)
+            } else if (prop.indexOf('java.runtime.version') > -1) {
+                const verString = prop.split('=')[1].trim();
+                logger.debug(prop.trim());
+                const objectVersion = JavaGuard.parseJavaRuntimeVersion(verString);
                 // TODO implement a support matrix eventually. Right now this is good enough
                 // 1.7-1.16 = Java 8
                 // 1.17+ = Java 17
                 // Actual support may vary, but we're going with this rule for simplicity.
                 if (objectVersion.major < 9 && !MinecraftUtil.mcVersionAtLeast('1.17', this.mcVersion)) {
                     // Java 8
-                    if (objectVersion.major === 8 && objectVersion.update! > 52) {
-                        meta.version = objectVersion
-                        ++checksum
+                    if (objectVersion.major === 8 && objectVersion.update && objectVersion.update > 52) {
+                        meta.version = objectVersion;
+                        ++checksum;
                         if (checksum === goal) break;
                     }
                 } else if (objectVersion.major >= 17 && MinecraftUtil.mcVersionAtLeast('1.17', this.mcVersion)) {
                     // Java 9+
-                    meta.version = objectVersion
-                    ++checksum
+                    meta.version = objectVersion;
+                    ++checksum;
                     if (checksum === goal) break;
                 }
                 // Space included so we get only the vendor.
-            } else if (props[i].lastIndexOf('java.vendor ') > -1) {
-                let vendorName = props[i].split('=')[1].trim()
-                logger.debug(props[i].trim())
-                meta.vendor = vendorName
-            } else if (props[i].indexOf('os.arch') > -1) {
-                meta.isARM = props[i].split('=')[1].trim() === 'aarch64'
+            } else if (prop.lastIndexOf('java.vendor ') > -1) {
+                const vendorName = prop.split('=')[1].trim();
+                logger.debug(prop.trim());
+                meta.vendor = vendorName;
+            } else if (prop.indexOf('os.arch') > -1) {
+                meta.isARM = prop.split('=')[1].trim() === 'aarch64';
             }
+
         }
-
-        meta.valid = checksum === goal
-
-        return meta
+        meta.valid = checksum === goal;
+        return meta;
     }
 
 
@@ -520,30 +470,31 @@ export class JavaGuard extends EventEmitter {
      * 
      * @returns {Promise.<Object>} A promise which resolves to a meta object about the JVM.
      * The validity is stored inside the `valid` property.
+     * // TODO: TO refacto 
      */
-    private validateJavaBinary(binaryExecPath): Promise<JavaMetaObject | null> {
+    private validateJavaBinary(binaryExecPath: string): Promise<JavaMetaObject | null> {
         return new Promise((resolve, _reject) => {
             if (!JavaGuard.isJavaExecPath(binaryExecPath)) {
-                resolve(null)
+                resolve(null);
             } else if (existsSync(binaryExecPath)) {
                 // Workaround (javaw.exe no longer outputs this information.)
-                logger.debug(typeof binaryExecPath)
+                logger.debug(typeof binaryExecPath);
                 if (binaryExecPath.indexOf('javaw.exe') > -1) {
-                    binaryExecPath.replace('javaw.exe', 'java.exe')
+                    binaryExecPath.replace('javaw.exe', 'java.exe');
                 }
                 exec('"' + binaryExecPath + '" -XshowSettings:properties', (_err, _stdout, stderr) => {
                     try {
                         // Output is stored in stderr?
-                        resolve(this.validateJVMProperties(stderr) as JavaMetaObject)
+                        resolve(this.validateJVMProperties(stderr));
                     } catch (err) {
                         // Output format might have changed, validation cannot be completed.
-                        resolve(null)
+                        resolve(null);
                     }
-                })
+                });
             } else {
-                resolve(null)
+                resolve(null);
             }
-        })
+        });
 
     }
 
@@ -555,21 +506,20 @@ export class JavaGuard extends EventEmitter {
      */
     private async validateJavaRootSet(rootSet: Set<string>) {
 
-        const rootArr = Array.from(rootSet)
-        const validArr: JavaMetaObject[] = []
+        const rootArr = Array.from(rootSet);
+        const validArr: JavaMetaObject[] = [];
 
-        for (let i = 0; i < rootArr.length; i++) {
+        for (const root of rootArr) {
+            const execPath = JavaGuard.javaExecFromRoot(root);
 
-            const execPath = JavaGuard.javaExecFromRoot(rootArr[i])
-
-            let metaObj: JavaMetaObject | null = await this.validateJavaBinary(execPath);
+            const metaObj: JavaMetaObject | null = await this.validateJavaBinary(execPath);
             if (!metaObj) continue;
 
-            metaObj.execPath = execPath
-            validArr.push(metaObj)
+            metaObj.execPath = execPath;
+            validArr.push(metaObj);
         }
 
-        return validArr
+        return validArr;
 
     }
 
@@ -590,12 +540,12 @@ export class JavaGuard extends EventEmitter {
     private async win32JavaValidate(dataDir: string): Promise<string | null> {
 
         // Get possible paths from the registry.
-        let pathSet1 = await JavaGuard.scanRegistry()
+        let pathSet1 = await JavaGuard.scanRegistry();
         if (pathSet1.size === 0) {
 
             // Do a manual file system scan of program files.
             // Check all drives
-            const driveMounts = nodeDiskInfo.getDiskInfoSync().map(({ mounted }) => mounted)
+            const driveMounts = nodeDiskInfo.getDiskInfoSync().map(({ mounted }) => mounted);
             for (const mount of driveMounts) {
                 pathSet1 = new Set<string>([
                     ...pathSet1,
@@ -603,27 +553,27 @@ export class JavaGuard extends EventEmitter {
                     ...(await JavaGuard.scanFileSystem(`${mount}\\Program Files\\Eclipse Adoptium`)),
                     ...(await JavaGuard.scanFileSystem(`${mount}\\Program Files\\Eclipse Foundation`)),
                     ...(await JavaGuard.scanFileSystem(`${mount}\\Program Files\\AdoptOpenJDK`))
-                ])
+                ]);
             }
 
         }
 
         // Get possible paths from the data directory.
-        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'))
+        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'));
 
         // Merge the results.
-        const uberSet = new Set([...pathSet1, ...pathSet2])
+        const uberSet = new Set([...pathSet1, ...pathSet2]);
 
         // Validate JAVA_HOME.
-        const jHome = JavaGuard.scanJavaHome()
+        const jHome = await JavaGuard.scanJavaHome();
         if (jHome != null && jHome.indexOf('(x86)') === -1) {
-            uberSet.add(jHome)
+            uberSet.add(jHome);
         }
 
-        let pathArr = await this.validateJavaRootSet(uberSet)
-        pathArr = JavaGuard.sortValidJavaArray(pathArr)
+        let pathArr = await this.validateJavaRootSet(uberSet);
+        pathArr = JavaGuard.sortValidJavaArray(pathArr);
 
-        return pathArr.length > 0 ? pathArr[0].execPath! : null;
+        return pathArr.length > 0 ? pathArr[0].execPath ?? null : null;
     }
 
     /**
@@ -644,29 +594,29 @@ export class JavaGuard extends EventEmitter {
      */
     private async darwinJavaValidate(dataDir: string): Promise<string | null> {
 
-        const pathSet1 = await JavaGuard.scanFileSystem('/Library/Java/JavaVirtualMachines')
-        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'))
+        const pathSet1 = await JavaGuard.scanFileSystem('/Library/Java/JavaVirtualMachines');
+        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'));
 
-        const uberSet = new Set([...pathSet1, ...pathSet2])
+        const uberSet = new Set([...pathSet1, ...pathSet2]);
 
         // Check Internet Plugins folder.
-        const iPPath = JavaGuard.scanInternetPlugins()
+        const iPPath = JavaGuard.scanInternetPlugins();
         if (iPPath != null) {
-            uberSet.add(iPPath)
+            uberSet.add(iPPath);
         }
 
         // Check the JAVA_HOME environment variable.
-        let jHome = JavaGuard.scanJavaHome()
+        let jHome = await JavaGuard.scanJavaHome();
         if (jHome != null) {
             // Ensure we are at the absolute root.
             if (jHome.includes('/Contents/Home')) {
-                jHome = jHome.substring(0, jHome.indexOf('/Contents/Home'))
+                jHome = jHome.substring(0, jHome.indexOf('/Contents/Home'));
             }
-            uberSet.add(jHome)
+            uberSet.add(jHome);
         }
 
-        let pathArr = await this.validateJavaRootSet(uberSet)
-        pathArr = JavaGuard.sortValidJavaArray(pathArr)
+        let pathArr = await this.validateJavaRootSet(uberSet);
+        pathArr = JavaGuard.sortValidJavaArray(pathArr);
 
         if (pathArr.length > 0) {
 
@@ -674,13 +624,13 @@ export class JavaGuard extends EventEmitter {
             // probably just filter out the invalid architectures before it even
             // gets to this point.
             if (DevUtil.isARM64) {
-                return pathArr.find(({ isARM }) => isARM)?.execPath ?? null
+                return pathArr.find(({ isARM }) => isARM)?.execPath ?? null;
             } else {
-                return pathArr.find(({ isARM }) => !isARM)?.execPath ?? null
+                return pathArr.find(({ isARM }) => !isARM)?.execPath ?? null;
             }
 
         } else {
-            return null
+            return null;
         }
     }
 
@@ -699,21 +649,21 @@ export class JavaGuard extends EventEmitter {
      */
     async linuxJavaValidate(dataDir: string): Promise<string | null> {
 
-        const pathSet1 = await JavaGuard.scanFileSystem('/usr/lib/jvm')
-        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'))
+        const pathSet1 = await JavaGuard.scanFileSystem('/usr/lib/jvm');
+        const pathSet2 = await JavaGuard.scanFileSystem(join(dataDir, 'runtime', 'x64'));
 
-        const uberSet = new Set([...pathSet1, ...pathSet2])
+        const uberSet = new Set([...pathSet1, ...pathSet2]);
 
         // Validate JAVA_HOME
-        const jHome = JavaGuard.scanJavaHome()
+        const jHome = await JavaGuard.scanJavaHome();
         if (jHome != null) {
-            uberSet.add(jHome)
+            uberSet.add(jHome);
         }
 
-        let pathArr = await this.validateJavaRootSet(uberSet)
-        pathArr = JavaGuard.sortValidJavaArray(pathArr)
+        let pathArr = await this.validateJavaRootSet(uberSet);
+        pathArr = JavaGuard.sortValidJavaArray(pathArr);
 
-        return pathArr.length > 0 ? pathArr[0].execPath! : null;
+        return pathArr.length > 0 ? pathArr[0].execPath ?? null : null;
     }
 
     /**
@@ -722,8 +672,17 @@ export class JavaGuard extends EventEmitter {
      * @param {string} dataDir The base launcher directory.
      * @returns {string} A path to a valid x64 Java installation, null if none found.
      */
-    public async validateJava(dataDir) {
-        return this[process.platform + 'JavaValidate'](dataDir)
+    public async validateJava(dataDir: string) {
+        switch (process.platform) {
+            case "win32":
+                return this.win32JavaValidate(dataDir);
+            case "darwin":
+                return this.darwinJavaValidate(dataDir);
+            case "linux":
+                return this.linuxJavaValidate(dataDir);
+            default:
+                throw new Error("Distribution not supported");
+        }
     }
 
 

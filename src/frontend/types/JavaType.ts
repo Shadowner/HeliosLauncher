@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 export type AdoptiumBinary = {
     binary: {
         architecture: string,
@@ -44,6 +45,9 @@ export type JavaRuntimeVersion = {
 
 export type JavaMetaObject = {
     execPath?: string,
+    vendor?: string,
     version: JavaRuntimeVersion,
     isARM?: boolean,
+    valid?: boolean,
+    arch?: string,
 }

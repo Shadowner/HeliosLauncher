@@ -4,8 +4,8 @@ import { existsSync, readFileSync, writeFileSync } from "fs-extra";
 import os from 'os';
 import { join } from 'path';
 import { MinecraftUtil } from "../util/MinecraftUtil";
-import { resolveMaxRAM, resolveMinRAM } from "../util/System";
 import { Module } from "../models/Module";
+import { SystemUtil } from '../util/System';
 
 const logger = LoggerUtil.getLogger("ConfigManager");
 
@@ -14,19 +14,26 @@ type ModConfigFallBack = {
     value: boolean,
 }
 
-type ModConfig = {
+export type ModConfig = {
     id: string,
     mods: Record<string, Module | ModConfigFallBack> | ModConfigFallBack,
+    value?: boolean,
 }
 
-export type AuthData<T = 'mojang' | 'microsoft'> = {
-    type: T,
+export type AuthData = {
+    type: 'mojang',
     accessToken: string,
     username: string,
     uuid: string,
     displayName: string,
-    expiresAt: T extends 'mojang' ? undefined : Date,
-    microsoft: T extends 'mojang' ? undefined : {
+} | {
+    type: "microsoft",
+    accessToken: string,
+    username: string,
+    uuid: string,
+    displayName: string,
+    expiresAt: Date,
+    microsoft: {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         access_token: string,
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -84,8 +91,8 @@ export class ConfigManager {
     // TODO: Resolve true path;
     private static launcherDir = process.env.CONFIG_DIRECT_PATH ?? "";
     public static readonly distributionURL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json';
-    public static readonly launcherName = 'Helios-Launcher'
-    public static readonly azureClientId = '1ce6e35a-126f-48fd-97fb-54d143ac6d45'
+    public static readonly launcherName = 'Helios-Launcher';
+    public static readonly azureClientId = '1ce6e35a-126f-48fd-97fb-54d143ac6d45';
     /**
      * Three types of values:
      * Static = Explicitly declared.
@@ -117,7 +124,7 @@ export class ConfigManager {
         authenticationDatabase: {},
         modConfigurations: [],
         javaConfig: {},
-    }
+    };
 
     private static config: Config;
 
@@ -347,8 +354,8 @@ export class ConfigManager {
      * @param {string} uuid The uuid of the authenticated account.
      * @returns {Object} The authenticated account with the given uuid.
      */
-    public static getAuthAccountByUuid<T extends 'mojang' | 'microsoft'>(uuid: string): AuthData<T> {
-        return this.config.authenticationDatabase[uuid] as AuthData<T>;
+    public static getAuthAccountByUuid(uuid: string): AuthData {
+        return this.config.authenticationDatabase[uuid];
     };
 
     /**
@@ -377,14 +384,12 @@ export class ConfigManager {
      */
     public static addMojangAuthAccount(uuid: string, accessToken: string, username: string, displayName: string) {
         this.config.selectedAccount = uuid;
-        (this.config.authenticationDatabase[uuid] as AuthData<'mojang'>) = {
+        (this.config.authenticationDatabase[uuid]) = {
             type: "mojang",
             accessToken,
             username: username.trim(),
             uuid: uuid.trim(),
             displayName: displayName.trim(),
-            expiresAt: undefined,
-            microsoft: undefined,
 
         };
         return this.config.authenticationDatabase[uuid];
@@ -403,12 +408,15 @@ export class ConfigManager {
      * @returns {Object} The authenticated account object created by this action.
      */
     public static updateMicrosoftAuthAccount(uuid: string, accessToken: string, msAccessToken: string, msRefreshToken: string, msExpires: Date, mcExpires: Date) {
-        this.config.authenticationDatabase[uuid].accessToken = accessToken;
-        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).expiresAt = mcExpires;
-        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.access_token = msAccessToken;
-        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.refresh_token = msRefreshToken;
-        (this.config.authenticationDatabase[uuid] as AuthData<'microsoft'>).microsoft.expires_at = msExpires;
-        return this.config.authenticationDatabase[uuid];
+        const authAccount = this.config.authenticationDatabase[uuid];
+        if (authAccount.type !== 'microsoft') throw new Error('Not a microsoft account');
+
+        authAccount.accessToken = accessToken;
+        authAccount.expiresAt = mcExpires;
+        authAccount.microsoft.access_token = msAccessToken;
+        authAccount.microsoft.refresh_token = msRefreshToken;
+        authAccount.microsoft.expires_at = msExpires;
+        return authAccount;
     };
 
     /**
@@ -688,7 +696,7 @@ export class ConfigManager {
      * @param {number} resWidth The new width of the game window.
      */
     public static setGameWidth(resWidth: number) {
-        if (typeof resWidth !== "number") throw new Error("Only Accept Number")
+        if (typeof resWidth !== "number") throw new Error("Only Accept Number");
         this.config.settings.game.resWidth = resWidth;
     };
 
@@ -699,7 +707,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the value is valid.
      */
     public static validateGameWidth(resWidth: number) {
-        if (typeof resWidth !== "number") throw new Error("Only Accept Number")
+        if (typeof resWidth !== "number") throw new Error("Only Accept Number");
         return Number.isInteger(resWidth) && resWidth >= 0;
     };
 
@@ -719,7 +727,7 @@ export class ConfigManager {
      * @param {number} resHeight The new height of the game window.
      */
     public static setGameHeight(resHeight: number) {
-        if (typeof resHeight !== "number") throw new Error("Only Accept Number")
+        if (typeof resHeight !== "number") throw new Error("Only Accept Number");
         this.config.settings.game.resHeight = resHeight;
     };
 
@@ -730,7 +738,7 @@ export class ConfigManager {
      * @returns {boolean} Whether or not the value is valid.
      */
     public static validateGameHeight(resHeight: number) {
-        if (typeof resHeight !== "number") throw new Error("Only Accept Number")
+        if (typeof resHeight !== "number") throw new Error("Only Accept Number");
         return Number.isInteger(resHeight) && resHeight >= 0;
     };
 
@@ -822,16 +830,16 @@ export class ConfigManager {
 
     private static defaultJavaConfigBelow117() {
         return {
-            minRAM: resolveMinRAM(),
-            maxRAM: resolveMaxRAM(), // Dynamic
+            minRAM: SystemUtil.resolveMinRAM(),
+            maxRAM: SystemUtil.resolveMaxRAM(), // Dynamic
             jvmOptions: ["-XX:+UseConcMarkSweepGC", "-XX:+CMSIncrementalMode", "-XX:-UseAdaptiveSizePolicy", "-Xmn128M"],
         };
     }
 
     private static defaultJavaConfig117() {
         return {
-            minRAM: resolveMinRAM(),
-            maxRAM: resolveMaxRAM(), // Dynamic
+            minRAM: SystemUtil.resolveMinRAM(),
+            maxRAM: SystemUtil.resolveMaxRAM(), // Dynamic
             jvmOptions: ["-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"],
         };
     }

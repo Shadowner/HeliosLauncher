@@ -7,7 +7,7 @@ import {
     microsoftErrorDisplayable,
 } from "helios-core/microsoft";
 import { MojangRestAPI, mojangErrorDisplayable, MojangErrorCode } from "helios-core/mojang";
-import { AuthData, ConfigManager } from "../manager/ConfigManager";
+import { ConfigManager } from "../manager/ConfigManager";
 
 const log = LoggerUtil.getLogger("AuthManager");
 
@@ -82,7 +82,7 @@ export class AuthManager {
      */
     public async removeMojangAccount(uuid: string) {
         try {
-            const authData = ConfigManager.getAuthAccountByUuid<"mojang">(uuid);
+            const authData = ConfigManager.getAuthAccountByUuid(uuid);
             const response = await MojangRestAPI.invalidate(authData.accessToken, ConfigManager.clientToken ?? "");
             if (response.responseStatus === RestResponseStatus.SUCCESS) {
                 ConfigManager.removeAuthAccount(uuid);
@@ -243,7 +243,8 @@ export class AuthManager {
      * otherwise false.
      */
     private async validateSelectedMicrosoftAccount() {
-        const current = ConfigManager.selectedAccount as AuthData<"microsoft">;
+        const current = ConfigManager.selectedAccount;
+        if (current?.type !== "microsoft") throw new Error("Not a Microsoft Account");
         const now = new Date().getTime();
         const mcExpiresAt = current.expiresAt;
         const mcExpired = now >= mcExpiresAt?.getTime();
